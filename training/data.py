@@ -30,9 +30,10 @@ def build_xy(
     if labeled.empty:
         raise ValueError("ラベル付きの行が1件もありません。")
 
-    cols = [c for c in features if c in labeled.columns]
-    if not cols:
-        raise KeyError(f"指定した特徴量列がCSVにありません: {list(features)}")
+    missing = [c for c in features if c not in labeled.columns]
+    if missing:
+        raise KeyError(f"特徴量列がCSVにありません: {missing}")
+    cols = list(features)
 
     x = labeled[cols].apply(pd.to_numeric, errors="coerce").fillna(0.0)
     y = labeled[label].astype(str)
