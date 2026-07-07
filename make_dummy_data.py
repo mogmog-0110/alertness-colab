@@ -51,39 +51,52 @@ def _distraction_center(k: int) -> dict:
     }
 
 
-def _row(subject: str, t: float, values: dict, drowsiness: str, distraction: str) -> dict:
+def _row(
+    subject: str, context: str, t: float, values: dict, drowsiness: str, distraction: str
+) -> dict:
     return {
         "session_id": subject, "subject": subject, "timestamp": round(t, 3), "face_present": 1,
         **{k: round(v, 4) for k, v in values.items()},
         "dim_drowsiness_score": "", "dim_drowsiness_level": "",
         "dim_distraction_score": "", "dim_distraction_level": "",
         "label": "", "label_drowsiness": drowsiness, "label_distraction": distraction,
-        "context": "study",
+        "context": context,
     }
 
 
-def _rows_for_subject(subject: str, rng: np.random.Generator, per_level: int) -> list[dict]:
+def _rows_for_subject(
+    subject: str, context: str, rng: np.random.Generator, per_level: int
+) -> list[dict]:
     rows: list[dict] = []
     t = 0.0
     for k, level in enumerate(_LEVELS):
         for _ in range(per_level):
-            rows.append(_row(subject, t, _noisy(_drowsiness_center(k), rng), level, "none"))
+            values = _noisy(_drowsiness_center(k), rng)
+            rows.append(_row(subject, context, t, values, level, "none"))
             t += 1 / 30.0
     for k, level in enumerate(_LEVELS):
         for _ in range(per_level):
-            rows.append(_row(subject, t, _noisy(_distraction_center(k), rng), "none", level))
+            values = _noisy(_distraction_center(k), rng)
+            rows.append(_row(subject, context, t, values, "none", level))
             t += 1 / 30.0
     return rows
 
 
-def generate(out_dir: str, subjects: int = 3, per_level: int = 120, seed: int = 0) -> list[Path]:
+def generate(
+    out_dir: str,
+    subjects: int = 4,
+    per_level: int = 120,
+    seed: int = 0,
+    contexts: tuple[str, ...] = ("study", "driving"),
+) -> list[Path]:
     directory = Path(out_dir)
     directory.mkdir(parents=True, exist_ok=True)
     rng = np.random.default_rng(seed)
     written: list[Path] = []
     for i in range(subjects):
         subject = f"dummy{i + 1:02d}"
-        rows = _rows_for_subject(subject, rng, per_level)
+        context = contexts[i % len(contexts)]  # 用途を被験者ごとに振り分ける
+        rows = _rows_for_subject(subject, context, rng, per_level)
         path = directory / f"{subject}.csv"
         with path.open("w", newline="", encoding="utf-8") as f:
             writer = csv.DictWriter(f, fieldnames=_FIELDS)

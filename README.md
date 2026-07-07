@@ -46,6 +46,7 @@ Colab なら、クローンしてから最初のセルで `!pip install -q -r re
   | `label_drowsiness` | 眠気の正解。`none` / `low` / `medium` / `high` |
   | `label_distraction` | よそ見の正解。`none` / `low` / `medium` / `high` |
   | `subject` | 被験者ID。同じ人が train と test に混ざらないよう分けるのに使う |
+  | `context` | 用途タグ（study / driving 等）。用途別にモデルを分けるとき使う（任意） |
 
   例（一部の列）：
 
@@ -83,6 +84,22 @@ def build():
 
 `build()` は軸（眠気・よそ見）ごとに呼ばれるので、毎回新しいインスタンスを返すこと。
 1ファイルずつ独立して足せるので、同じファイルを取り合わずに分担できる。
+
+### 用途(context)で分ける（任意）
+
+注意逸脱（distraction）の意味は用途で変わる（運転の脇見と自習の脇見は別物）。
+ノートの `CONTEXT` に用途名を入れると、注意逸脱はその用途のフレームだけで学習し、
+`model_study.pkl` のように用途別のモデルを書き出す。
+
+- `CONTEXT = ''`：全用途をプールして1モデル（既定）
+- `CONTEXT = 'study'`：注意逸脱は study のフレームだけで学習
+
+眠気（drowsiness）は用途で意味が変わらないので、`CONTEXT` を指定しても常に全データで
+学習する（`training/config.py` の `CONTEXT_FREE_AXES`）。用途を分けるほど1モデルあたりの
+データは減るため、データが少ないうちは `CONTEXT=''` で始めるのがよい。
+
+用途別モデルはアプリ側の config で `policy.model_path: models/model_study.pkl` のように
+用途に合ったファイルを指すだけで使える。
 
 ### 4. 学習してモデルを作る
 

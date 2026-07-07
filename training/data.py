@@ -20,6 +20,13 @@ def load_frames(data_dir: str) -> pd.DataFrame:
     return pd.concat((pd.read_csv(f) for f in files), ignore_index=True)
 
 
+def filter_context(df: pd.DataFrame, context: str) -> pd.DataFrame:
+    """用途(context)でフレームを絞る。context 列が無ければ該当なし（空）を返す。"""
+    if "context" not in df.columns:
+        return df.iloc[0:0]
+    return df[df["context"].astype(str).str.strip() == context]
+
+
 def build_xy(
     df: pd.DataFrame, features: Sequence[str], label: str, group: str
 ) -> tuple[pd.DataFrame, pd.Series, pd.Series | None, list[str]]:

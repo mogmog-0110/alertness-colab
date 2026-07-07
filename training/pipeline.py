@@ -4,21 +4,34 @@
 眠気だけ付いたデータでも眠気モデルだけ学習できる。アルゴリズムは呼び出し側から
 build_model として渡す（引数なしで新しいモデルを返す関数）。軸ごとに呼び直して
 別インスタンスを得るので、1軸目の学習状態を2軸目に持ち越さない。
+
+用途(context)を指定すると、用途依存の軸（注意逸脱）はその用途のフレームだけで
+学習する。眠気のように用途で意味が変わらない軸は context_free_axes に入れておき、
+常に全データで学習する。
 """
 
 from __future__ import annotations
 
 from collections.abc import Callable
 
+import pandas as pd
+
 from .artifact import save_bundle
 from .config import TrainConfig
-from .data import build_xy, load_frames
+from .data import build_xy, filter_context, load_frames
 from .metrics import scorecard
 from .splits import split_indices
 
 
+def _rows_for_axis(df: pd.DataFrame, cfg: TrainConfig, target: str) -> pd.DataFrame:
+    # 用途未指定、または用途非依存の軸は全プール。それ以外は用途で絞る。
+    if not cfg.context or target in cfg.context_free_axes:
+        return df
+    return filter_context(df, cfg.context)
+
+
 def _train_one(
-    df, cfg: TrainConfig, target: str, build_model: Callable[[], object]
+    df: pd.DataFrame, cfg: TrainConfig, target: str, build_model: Callable[[], object]
 ) -> tuple[object, dict, dict]:
     x, y, groups, cols = build_xy(df, cfg.features, target, cfg.group)
     train_idx, test_idx = split_indices(x, y, groups, cfg.test_size, cfg.seed)
@@ -43,16 +56,25 @@ def run_training(cfg: TrainConfig, build_model: Callable[[], object]) -> dict:
     for target in cfg.targets:
         if target not in df.columns:
             continue
-        model, score, info = _train_one(df, cfg, target, build_model)
+        df_axis = _rows_for_axis(df, cfg, target)
+        if df_axis.empty:
+            continue  # この用途のこの軸にはデータが無い
+        model, score, info = _train_one(df_axis, cfg, target, build_model)
         models[target] = model
         scores[target] = score
         counts[target] = {"train": info["train"], "test": info["test"]}
         features = info["features"]
 
     if not models:
-        raise ValueError("学習できる軸がありません（ターゲット列が見つからない）。")
+        raise ValueError("学習できる軸がありません（ターゲット列が無い / 用途に該当データ無し）。")
 
     classes = {axis: list(getattr(m, "classes_", [])) for axis, m in models.items()}
     save_bundle(cfg.out_path, models, features, classes)
 
-    return {"scores": scores, "features": features, "counts": counts, "artifact": cfg.out_path}
+    return {
+        "scores": scores,
+        "features": features,
+        "counts": counts,
+        "context": cfg.context,
+        "artifact": cfg.out_path,
+    }
