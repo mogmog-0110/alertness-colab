@@ -1,4 +1,4 @@
 pandas
-scikit-learn
+scikit-learn==1.9.0  # 本体(alertness-recognition)の .[ml] と揃える。model.pkl の版ズレ防止
 joblib
 numpy
