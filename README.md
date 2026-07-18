@@ -49,6 +49,8 @@ pip install -r requirements.txt
   | `ear` `mar` `pitch_rel` `yaw_rel` `gaze_off` `jawOpen` | 特徴量（入力） |
   | `label_drowsiness` | 眠気の正解。`none` / `low` / `medium` / `high` |
   | `label_distraction` | よそ見の正解。`none` / `low` / `medium` / `high` |
+  | `label_concentration` | 集中の正解。`none` / `low` / `medium` / `high`（任意） |
+  | `label_stress` | ストレスの正解。`none` / `low` / `medium` / `high`（任意・生体信号由来） |
   | `subject` | 被験者ID。同じ人が train と test に混ざらないよう分けるのに使う |
   | `context` | 用途タグ（study / driving 等）。用途別にモデルを分けるとき使う（任意） |
 
