@@ -2,6 +2,10 @@
 
 前提は「アプリの特徴量CSVの列」だけ。どのデータセット由来かは問わない。
 ラベル無しの行（label が空）は学習・評価から外す。
+
+rPPG のように欠けるのが普通の列は、欠損を 0 で埋めるだけにせず、値があったかを
+別の列で渡す。学習で使う列の並びはこの関数の戻り値が正で、そのまま model.pkl に
+記録されてアプリの推論に使われる。
 """
 
 from __future__ import annotations
@@ -11,6 +15,8 @@ import os
 from collections.abc import Sequence
 
 import pandas as pd
+
+from .config import PRESENT_SUFFIX
 
 
 def load_frames(data_dir: str) -> pd.DataFrame:
@@ -28,7 +34,11 @@ def filter_context(df: pd.DataFrame, context: str) -> pd.DataFrame:
 
 
 def build_xy(
-    df: pd.DataFrame, features: Sequence[str], label: str, group: str
+    df: pd.DataFrame,
+    features: Sequence[str],
+    label: str,
+    group: str,
+    optional: Sequence[str] = (),
 ) -> tuple[pd.DataFrame, pd.Series, pd.Series | None, list[str]]:
     if label not in df.columns:
         raise KeyError(f"ラベル列 '{label}' がCSVにありません。")
@@ -40,9 +50,14 @@ def build_xy(
     missing = [c for c in features if c not in labeled.columns]
     if missing:
         raise KeyError(f"特徴量列がCSVにありません: {missing}")
-    cols = list(features)
+    x = labeled[list(features)].apply(pd.to_numeric, errors="coerce")
+    # 欠けるのが普通の列は「欠けていた」こと自体を特徴にする。0 で埋めるだけだと
+    # 心拍0bpm のような実在しない値を学習してしまう。
+    for name in optional:
+        if name in x.columns:
+            x[name + PRESENT_SUFFIX] = x[name].notna().astype(float)
+    x = x.fillna(0.0)
 
-    x = labeled[cols].apply(pd.to_numeric, errors="coerce").fillna(0.0)
     y = labeled[label].astype(str)
     groups = labeled[group].astype(str) if group in labeled.columns else None
-    return x, y, groups, cols
+    return x, y, groups, list(x.columns)

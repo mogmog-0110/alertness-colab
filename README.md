@@ -46,7 +46,15 @@ pip install -r requirements.txt
 
   | 列 | 意味 |
   |---|---|
-  | `ear` `mar` `pitch_rel` `yaw_rel` `gaze_off` `jawOpen` | 特徴量（入力） |
+  | `ear_norm` `mar_rel` `pitch_rel` `yaw_rel` `gaze_off` | 特徴量（幾何。キャリブで個人差を吸収した相対値） |
+  | `jawOpen` `eyeBlinkLeft` `eyeBlinkRight` | 特徴量（あくび・瞬き） |
+  | `browDown*`(AU4) `eyeSquint*`(AU7) `mouthPress*`(AU24) `mouthFrown*`(AU15) `cheekSquint*`(AU6) `browInnerUp` | 特徴量（表情。ストレスの手がかり） |
+  | `hr_bpm` `rppg_quality` `hrv_rmssd` | 特徴量（rPPG。**大半のフレームで空になる**） |
+
+  rPPG の列は信号品質のしきい値を通ったフレームでしか埋まらない（実測で2割ほど）。
+  学習では欠損を 0 で埋めるだけにせず `<列名>_present` を自動で足し、「値があったか」も
+  特徴として渡す。アプリ側の推論も同じ規約で埋めるので、列の並びは `model.pkl` の
+  `features` が唯一の取り決めになる。
   | `label_drowsiness` | 眠気の正解。`none` / `low` / `medium` / `high` |
   | `label_distraction` | よそ見の正解。`none` / `low` / `medium` / `high` |
   | `label_concentration` | 集中の正解。`none` / `low` / `medium` / `high`（任意） |
