@@ -1,6 +1,6 @@
 """学習の一連の流れ。読み込み→（軸ごとに）分割→学習→採点→保存を1本にまとめる。
 
-正準ラベルは2軸なので、軸ごとに1モデルを学習する。ラベルが無い軸は飛ばすので、
+正準ラベルは4軸なので、軸ごとに1モデルを学習する。ラベルが無い軸は飛ばすので、
 眠気だけ付いたデータでも眠気モデルだけ学習できる。アルゴリズムは呼び出し側から
 build_model として渡す（引数なしで新しいモデルを返す関数）。軸ごとに呼び直して
 別インスタンスを得るので、1軸目の学習状態を2軸目に持ち越さない。
@@ -33,14 +33,20 @@ def _rows_for_axis(df: pd.DataFrame, cfg: TrainConfig, target: str) -> pd.DataFr
 def _train_one(
     df: pd.DataFrame, cfg: TrainConfig, target: str, build_model: Callable[[], object]
 ) -> tuple[object, dict, dict]:
-    x, y, groups, cols = build_xy(df, cfg.features, target, cfg.group)
+    x, y, groups, cols = build_xy(
+        df, cfg.features, target, cfg.group, cfg.optional_features
+    )
     train_idx, test_idx = split_indices(x, y, groups, cfg.test_size, cfg.seed)
 
+    # 学習も推論も numpy 配列で渡す。DataFrame で学習すると列名がモデルに焼き付き、
+    # 列名を持たないアプリ側の推論で警告が出る。並び順の取り決めは model.pkl の
+    # features（build_xy の戻り値）1つに絞る。
+    matrix = x.to_numpy(dtype=float)
     model = build_model()
-    model.fit(x.iloc[train_idx], y.iloc[train_idx])
+    model.fit(matrix[train_idx], y.iloc[train_idx])
 
     y_true = list(y.iloc[test_idx])
-    y_pred = list(model.predict(x.iloc[test_idx]))
+    y_pred = list(model.predict(matrix[test_idx]))
     labels = sorted(set(y_true) | set(y_pred))
     score = scorecard(y_true, y_pred, labels, negative_label="none")
     return model, score, {"train": len(train_idx), "test": len(test_idx), "features": cols}
